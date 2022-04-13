@@ -2,8 +2,6 @@ from __future__ import print_function
 
 import functools
 import operator
-import time
-
 from aliyun.log import *
 import os
 import requests
@@ -54,7 +52,7 @@ def generate_date():
     return past_time, current_time
 
 
-def build_signature(customer_id, shared_key, date, content_length, method, content_type, resource):
+def build_signature(date, content_length, method, content_type, resource):
     x_headers = 'x-ms-date:' + date
     string_to_hash = method + "\n" + str(content_length) + "\n" + content_type + "\n" + x_headers + "\n" + resource
     bytes_to_hash = bytes(string_to_hash, encoding="utf-8")
@@ -71,7 +69,7 @@ def post_data(chunk):
     resource = '/api/logs'
     rfc1123date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
     content_length = len(body)
-    signature = build_signature(customer_id, shared_key, rfc1123date, content_length, method, content_type, resource)
+    signature = build_signature(rfc1123date, content_length, method, content_type, resource)
     uri = 'https://' + customer_id + '.ods.opinsights.azure.com' + resource + '?api-version=2016-04-01'
 
     headers = {
@@ -124,7 +122,7 @@ def get_list_logstores(client, project):
     return client.list_logstores(request).get_logstores()
 
 
-def get_logs(client, project, logstore, start_time, end_time, topic):
+def get_logs(client, project, logstore, start_time, end_time):
     res = client.get_log_all(project, logstore, start_time, end_time, topic)
     logs_json = []
     for logs in res:
@@ -137,7 +135,7 @@ def get_logs_from_logstores(client, project, start_time_ali_cloud, end_time_ali_
     logs_json = []
     logstores = get_list_logstores(client, project)
     for logstore in logstores:
-        logs_json += get_logs(client, project, logstore, start_time_ali_cloud, end_time_ali_cloud, topic)
+        logs_json += get_logs(client, project, logstore, start_time_ali_cloud, end_time_ali_cloud)
     return logs_json
 
 
@@ -159,12 +157,10 @@ def main(mytimer: func.TimerRequest) -> None:
 
     # get logs
     logs_json = []
-    tic = time.time()
     try:
         if user_projects == ['']:
             projects = client.list_project(size=-1).get_projects()
             project_names = list(map(lambda project_name: project_name["projectName"], projects))
-            print(project_names)
         else:
             project_names = user_projects
 
