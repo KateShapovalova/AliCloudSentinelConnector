@@ -1,0 +1,61 @@
+{
+   "name": "AliCloud_Cloudhub_CL",
+   "Properties": [
+       {
+           "Name": "TenantId",
+           "Type": "String"
+       },
+       {
+           "Name": "SourceSystem",
+           "Type": "String"
+       },
+       {
+           "Name": "MG",
+           "Type": "String"
+       },
+       {
+           "Name": "ManagementGroupName",
+           "Type": "String"
+       },
+       {
+           "Name": "TimeGenerated",
+           "Type": "DateTime"
+       },
+       {
+           "Name": "Computer",
+           "Type": "String"
+       },
+       {
+           "Name": "RawData",
+           "Type": "String"
+       },
+       {
+           "Name": "timestamp_d",
+           "Type": "Real"
+       },
+       {
+           "Name": "Type",
+           "Type": "String"
+       },
+       {
+           "Name": "_ResourceId",
+           "Type": "String"
+       },
+       {
+           "Name": "contents___tag_____pack_id___s",
+           "Type": "String"
+       },
+       {
+           "Name": "contents_event_s",
+           "Type": "String"
+       },
+       {
+           "Name": "source_s",
+           "Type": "String"
+       },
+       {
+           "Name": "contents___topic___s",
+           "Type": "String"
+       }
+   ]
+}

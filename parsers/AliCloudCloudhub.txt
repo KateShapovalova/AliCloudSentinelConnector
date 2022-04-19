@@ -1,0 +1,14 @@
+// Usage Instructions:
+// Paste below query in log analytics, click on Save button and select as Function from drop down by specifying function name as AliCloudCloudhub and specifying Legacy Category.
+// This function maps AliCloud Cloudhub events to Azure Sentinel Information Model (ASIM) (https://docs.microsoft.com/azure/sentinel/normalization).
+// Function usually takes 10-15 minutes to activate. You can then use function alias from any other queries (e.g. AliCloudCloudhub | take 10).
+// Reference : Using functions in Azure monitor log queries : https://docs.microsoft.com/azure/azure-monitor/log-query/functions
+AliCloud_Cloudhub_CL
+| extend EventVendor = 'AliCloud',
+         EventProduct = 'Cloudhub',
+         EventEndTime = unixtime_milliseconds_todatetime(timestamp_d)
+| project-rename ContentsTagPackId=contents___tag_____pack_id___s,
+                 ContentsEvent=contents_event_s
+                 Source=source_s
+                 ContentsTopic=contents___topic___s
+| project-away timestamp_d
