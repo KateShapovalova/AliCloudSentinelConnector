@@ -122,13 +122,16 @@ def get_list_logstores(client, project):
 
 def process_logstores(client, project, start_time, end_time):
     logstores = get_list_logstores(client, project)
+    logs_json_all = []
     for logstore in logstores:
-        res = client.get_log_all(project, logstore, str(start_time), str(end_time), topic)
         logs_json = []
+        res = client.get_log_all(project, logstore, str(start_time), str(end_time), topic)
         for logs in res:
             for log in logs.get_logs():
                 logs_json += [{"timestamp": log.timestamp, "source": log.source, "contents": log.contents}]
-        return logs_json
+        logs_json_all += logs_json
+        logging.info("Found {} logs from {} logstore from {} project".format(len(logs_json), logstore, project))
+    return logs_json_all
 
 
 def main(mytimer: func.TimerRequest) -> None:
@@ -139,8 +142,7 @@ def main(mytimer: func.TimerRequest) -> None:
     start_time, end_time = generate_date()
 
     if not endpoint or not accessKeyId or not accessKey:
-        logging.error("endpoint, access_id and access_key cannot be empty")
-        return
+        raise Exception("Endpoint, access_id and access_key cannot be empty")
 
     # authorization
     client = LogClient(endpoint, accessKeyId, accessKey, token)
