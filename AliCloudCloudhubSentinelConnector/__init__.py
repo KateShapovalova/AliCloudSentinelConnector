@@ -1,19 +1,18 @@
 from __future__ import print_function
 from aliyun.log import *
 import os
+import requests
 import datetime
+import hashlib
+import hmac
+import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from .state_manager import StateManager
 import re
 import azure.functions as func
-# from .state_manager_async import StateManagerAsync
-# from .sentinel_connector_async import AzureSentinelMultiConnectorAsync
-from state_manager_async import StateManagerAsync
-from sentinel_connector_async import AzureSentinelMultiConnectorAsync
-import asyncio
-import aiohttp
-import time
-# from azure.storage.blob.aio import ContainerClient
+import json
+import concurrent.futures
 
 endpoint = os.environ.get('Endpoint', 'cn-hangzhou.log.aliyuncs.com')
 accessKeyId = os.environ.get('AliCloudAccessKeyId', '')
@@ -27,18 +26,7 @@ log_type = "AliCloud"
 connection_string = os.environ['AzureWebJobsStorage']
 chunksize = 2000
 logAnalyticsUri = os.environ.get('logAnalyticsUri')
-
-# if ts of last event is older than now - MAX_PERIOD_MINUTES -> script will get events from now - MAX_PERIOD_MINUTES
-max_period_minutes = 60 * 24 * 7
-
-# Defines how many files can be processed simultaneously
-MAX_CONCURRENT_PROCESSING_FILES = int(os.environ.get('MAX_CONCURRENT_PROCESSING_FILES', 20))
-
-# Defines page size while listing files from blob storage. New page is not processed while old page is processing.
-MAX_PAGE_SIZE = int(MAX_CONCURRENT_PROCESSING_FILES * 1.5)
-
-# Defines max number of events that can be sent in one request to Azure Sentinel
-MAX_BUCKET_SIZE = int(os.environ.get('MAX_BUCKET_SIZE', 2000))
+workers = os.environ.get('AliCloudWorkers', '10')
 
 if ((logAnalyticsUri in (None, '') or str(logAnalyticsUri).isspace())):
     logAnalyticsUri = 'https://' + customer_id + '.ods.opinsights.azure.com'
@@ -49,118 +37,132 @@ if (not match):
     raise Exception("Ali Cloud: Invalid Log Analytics Uri")
 
 
-# async def main(mytimer: func.TimerRequest) -> None:
-#     if mytimer.past_due:
-#         logging.info('The timer is past due!')
-async def main() -> None:
-    logging.getLogger().setLevel(logging.INFO)
-    logging.info('Starting program')
-    # logging.info(
-    #     'Concurrency parameters: MAX_CONCURRENT_PROCESSING_FILES {}, MAX_PAGE_SIZE {}, MAX_BUCKET_SIZE {}.'.format(
-    #         MAX_CONCURRENT_PROCESSING_FILES, MAX_PAGE_SIZE, MAX_BUCKET_SIZE))
+def generate_date():
+    current_time = datetime.utcnow().replace(second=0, microsecond=0) - timedelta(minutes=10)
+    state = StateManager(connection_string=connection_string)
+    past_time = state.get()
+    if past_time is not None:
+        logging.info("The last time point is: {}".format(past_time))
+    else:
+        logging.info("There is no last time point, trying to get events for last hour")
+        past_time = (current_time - timedelta(minutes=3600))
+    state.post(current_time.strftime("%d.%m.%Y %H:%M:%S"))
+    return past_time, current_time
 
+
+def build_signature(customer_id, shared_key, date, content_length, method, content_type, resource):
+    x_headers = 'x-ms-date:' + date
+    string_to_hash = method + "\n" + str(content_length) + "\n" + content_type + "\n" + x_headers + "\n" + resource
+    bytes_to_hash = bytes(string_to_hash, encoding="utf-8")
+    decoded_key = base64.b64decode(shared_key)
+    encoded_hash = base64.b64encode(hmac.new(decoded_key, bytes_to_hash, digestmod=hashlib.sha256).digest()).decode()
+    authorization = "SharedKey {}:{}".format(customer_id, encoded_hash)
+    return authorization
+
+
+def post_data(chunk):
+    body = json.dumps(chunk)
+    method = 'POST'
+    content_type = 'application/json'
+    resource = '/api/logs'
+    rfc1123date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+    content_length = len(body)
+    signature = build_signature(customer_id, shared_key, rfc1123date, content_length, method, content_type, resource)
+    uri = 'https://' + customer_id + '.ods.opinsights.azure.com' + resource + '?api-version=2016-04-01'
+
+    headers = {
+        'content-type': content_type,
+        'Authorization': signature,
+        'Log-Type': log_type,
+        'x-ms-date': rfc1123date
+    }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with aiohttp.ClientSession() as session_sentinel:
-                Aliconn = AliCloudConnector(session=session, session_sentinel=session_sentinel)
-                client = LogClient(endpoint, accessKeyId, accessKey, token)
+        response = requests.post(uri, data=body, headers=headers)
 
-                if user_projects == ['']:
-                    projects = client.list_project(size=-1).get_projects()
-                    project_names = list(map(lambda project_name: project_name["projectName"], projects))
-                else:
-                    project_names = user_projects
-
-                tasks = []
-
-                for project in project_names:
-                    tasks.append(Aliconn.process_project(client, project))
-
-                await asyncio.gather(*tasks)
-
-        logging.info('Program finished. {} events have been sent.'.format(Aliconn.sentinel.successfull_sent_events_number))
-   # except Exception as err:
-    #    logging.error("Something wrong. Exception error text: {}".format(err))
-    except BufferError as err:
-        pass
-
-
-class AliCloudConnector:
-    def __init__(self, session: aiohttp.ClientSession, session_sentinel: aiohttp.ClientSession, max_concurrent_processing_files=10):
-        self.user_projects = user_projects
-        self.__access_key_id = accessKeyId
-        self.__access_key = accessKey
-        self.session = session
-        self.session_sentinel = session_sentinel
-        self._auth_lock = asyncio.Lock()
-        self.semaphore = asyncio.Semaphore(max_concurrent_processing_files)
-        self.logs_state_manager = StateManagerAsync(connection_string, share_name='alicloudcheckpoint',
-                                                         file_path='alicloudlastlog')
-        self.sentinel = AzureSentinelMultiConnectorAsync(self.session_sentinel, logAnalyticsUri, customer_id,
-                                                         shared_key, queue_size=10000)
-        self.sent_logs = 0
-        self.last_ts = None
-        self.total_blobs = 0
-        self.total_events = 0
-
-    # def _create_container_client(self):
-    #     return ContainerClient.from_connection_string(self.__conn_string, self.__container_name, logging_enable=False,
-    #                                                   max_single_get_size=2 * 1024 * 1024,
-    #                                                   max_chunk_get_size=2 * 1024 * 1024)
-
-    async def process_logstore(self, client, project, logstore):
-        # last_log_ts_ms = await self.logs_state_manager.get()/1000
-        last_log_ts_ms = 1650315600
-        max_period = int(time.time()) - max_period_minutes * 60
-        if not last_log_ts_ms or int(last_log_ts_ms) < max_period:
-            log_start_ts_ms = max_period
-            logging.info('Last log was too long ago or there is no info about last log timestamp.')
+        if 200 <= response.status_code <= 299:
+            logging.info("{} events was injected".format(len(chunk)))
+            return response.status_code
+        elif response.status_code == 401:
+            logging.error(
+                "The authentication credentials are incorrect or missing. Error code: {}".format(response.status_code))
         else:
-            log_start_ts_ms = int(last_log_ts_ms) + 1
-        logging.info('Starting searching logs from {}'.format(log_start_ts_ms))
+            logging.error("Something wrong. Error code: {}".format(response.status_code))
+        return 0
+    except Exception as err:
+        logging.error("Something wrong. Exception error text: {}".format(err))
 
-        async for event in self.get_logstore_logs(client, project, logstore, start_time=log_start_ts_ms):
-            if not last_log_ts_ms:
-                last_log_ts_ms = event['timestamp']
-            elif event['timestamp'] > int(last_log_ts_ms):
-                last_log_ts_ms = event['timestamp']
-            await self.sentinel.send(event, log_type=log_type)
-            self.sent_logs += 1
 
-        self.last_ts = last_log_ts_ms
+def gen_chunks_to_object(data, chunk_size=100):
+    chunk = []
+    for index, line in enumerate(data):
+        if index % chunk_size == 0 and index > 0:
+            yield chunk
+            del chunk[:]
+        chunk.append(line)
+    yield chunk
 
-        conn = self.sentinel.get_log_type_connector(log_type)
-        if conn:
-            await conn.flush()
-            logging.info('{} logs have been sent'.format(self.sent_logs))
-        await self.save_checkpoint()
 
-    async def get_logstores(self, client, project):
-        request = ListLogstoresRequest(project)
-        return client.list_logstores(request).get_logstores()
+def gen_chunks(data, start_time, end_time):
+    success = 0
+    failed = 0
+    for chunk in gen_chunks_to_object(data, chunk_size=chunksize):
+        status_code = post_data(chunk)
+        if 200 <= status_code <= 299:
+            success += len(chunk)
+        else:
+            failed += len(chunk)
+    logging.info("{} successfully added, {} failed. Period(UTC): {} - {}".format(success, failed, start_time.strftime(
+        "%d.%m.%Y %H:%M:%S"), end_time.strftime("%d.%m.%Y %H:%M:%S")))
 
-    async def process_project(self, client, project):
-        tasks = []
 
-        logstores = await self.get_logstores(client, project)
-        for logstore in logstores:
-            tasks.append(self.process_logstore(client, project, logstore))
+def get_list_logstores(client, project):
+    request = ListLogstoresRequest(project)
+    return client.list_logstores(request).get_logstores()
 
-        await asyncio.gather(*tasks)
 
-    async def get_logstore_logs(self, client, project, logstore, start_time):
-        end_time = int(time.time()) - 10
-        print(project, logstore)
-        res = client.get_log_all(project, logstore, start_time, end_time, topic)
+def process_logstores(client, project, start_time, end_time):
+    logstores = get_list_logstores(client, project)
+    for logstore in logstores:
+        res = client.get_log_all(project, logstore, str(start_time), str(end_time), topic)
+        logs_json = []
         for logs in res:
             for log in logs.get_logs():
-                yield {"timestamp": log.timestamp, "source": log.source, "contents": log.contents}
-
-    async def save_checkpoint(self):
-        if self.last_ts:
-            # await self.logs_state_manager.post(str(self.last_ts))
-            logging.info('Last ts saved - {}'.format(self.last_ts))
+                logs_json += [{"timestamp": log.timestamp, "source": log.source, "contents": log.contents}]
+        return logs_json
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+def main(mytimer: func.TimerRequest) -> None:
+    if mytimer.past_due:
+        logging.info('The timer is past due!')
+    logging.getLogger().setLevel(logging.INFO)
+    logging.info('Starting program')
+    start_time, end_time = generate_date()
+
+    if not endpoint or not accessKeyId or not accessKey:
+        logging.error("endpoint, access_id and access_key cannot be empty")
+        return
+
+    # authorization
+    client = LogClient(endpoint, accessKeyId, accessKey, token)
+
+    # get logs
+    logs_json = []
+    try:
+        if user_projects == ['']:
+            projects = client.list_project(size=-1).get_projects()
+            project_names = list(map(lambda project_name: project_name["projectName"], projects))
+        else:
+            project_names = user_projects
+
+        executor = concurrent.futures.ThreadPoolExecutor(int(workers))
+        futures = [executor.submit(process_logstores, client, project, start_time, end_time) for project in
+                   project_names]
+        concurrent.futures.wait(futures)
+        for future in futures:
+            if future.result() is not None:
+                logs_json += future.result()
+    except Exception as err:
+        logging.error("Something wrong. Exception error text: {}".format(err))
+
+    # Send data via data collector API
+    gen_chunks(logs_json, start_time=start_time, end_time=end_time)

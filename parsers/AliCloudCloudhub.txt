@@ -5,10 +5,8 @@
 // Reference : Using functions in Azure monitor log queries : https://docs.microsoft.com/azure/azure-monitor/log-query/functions
 AliCloud_Cloudhub_CL
 | extend EventVendor = 'AliCloud',
-         EventProduct = 'Cloudhub',
-         EventEndTime = unixtime_milliseconds_todatetime(timestamp_d)
+         EventProduct = 'Cloudhub'
 | project-rename ContentsTagPackId=contents___tag_____pack_id___s,
                  ContentsEvent=contents_event_s
                  Source=source_s
                  ContentsTopic=contents___topic___s
-| project-away timestamp_d
