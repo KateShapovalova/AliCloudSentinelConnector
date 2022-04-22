@@ -29,7 +29,7 @@
             "defaultValue": "<AliCloudProjects>"
         },
         "AliCloudWorkers": {
-            "type": "int",
+            "type": "number",
             "defaultValue": "<AliCloudWorkers>"
         }
     },
