@@ -8,7 +8,7 @@ import hmac
 import base64
 import logging
 from datetime import datetime, timedelta
-from .state_manager import StateManager
+from state_manager import StateManager
 import re
 import azure.functions as func
 import json

@@ -2,51 +2,107 @@
    "name": "AliCloud_Cloudhub_CL",
    "Properties": [
        {
-           "Name": "TenantId",
-           "Type": "String"
-       },
-       {
-           "Name": "SourceSystem",
-           "Type": "String"
-       },
-       {
-           "Name": "MG",
-           "Type": "String"
-       },
-       {
-           "Name": "ManagementGroupName",
-           "Type": "String"
-       },
-       {
            "Name": "TimeGenerated",
            "Type": "DateTime"
-       },
-       {
-           "Name": "Computer",
-           "Type": "String"
-       },
-       {
-           "Name": "RawData",
-           "Type": "String"
        },
        {
            "Name": "timestamp_d",
            "Type": "Real"
        },
        {
-           "Name": "Type",
+           "Name": "eventTime",
+           "Type": "DateTime"
+       },
+       {
+           "Name": "acsRegion",
            "Type": "String"
        },
        {
-           "Name": "_ResourceId",
+           "Name": "eventCategory",
            "Type": "String"
        },
        {
-           "Name": "contents___tag_____pack_id___s",
+           "Name": "eventName",
            "Type": "String"
        },
        {
-           "Name": "contents_event_s",
+           "Name": "eventId",
+           "Type": "String"
+       },
+       {
+           "Name": "eventType",
+           "Type": "String"
+       },
+       {
+           "Name": "additionalEventData_CallerBid_s",
+           "Type": "String"
+       },
+       {
+           "Name": "eventRW",
+           "Type": "String"
+       },
+       {
+           "Name": "eventSource",
+           "Type": "String"
+       },
+       {
+           "Name": "eventVersion",
+           "Type": "String"
+       },
+       {
+           "Name": "requestId",
+           "Type": "String"
+       },
+       {
+           "Name": "requestParameterJson_offset_s",
+           "Type": "String"
+       },
+       {
+           "Name": "requestParameterJson_size_s",
+           "Type": "String"
+       },
+       {
+           "Name": "requestParameters_offset_s",
+           "Type": "String"
+       },
+       {
+           "Name": "requestParameters_size_s",
+           "Type": "String"
+       },
+       {
+           "Name": "serviceName",
+           "Type": "String"
+       },
+       {
+           "Name": "sourceIpAddress",
+           "Type": "String"
+       },
+       {
+           "Name": "userAgent",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_accessKeyId_s",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_accountId_s",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_principalId_s",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_sessionContext_attributes_mfaAuthenticated_s",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_type_s",
+           "Type": "String"
+       },
+       {
+           "Name": "userIdentity_userName_s",
            "Type": "String"
        },
        {

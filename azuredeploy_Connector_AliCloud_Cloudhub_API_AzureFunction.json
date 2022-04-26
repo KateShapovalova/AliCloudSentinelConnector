@@ -26,11 +26,11 @@
         },
         "AliCloudProjects": {
             "type": "string",
-            "defaultValue": "<AliCloudProjects>"
+            "defaultValue": ""
         },
         "AliCloudWorkers": {
-            "type": "number",
-            "defaultValue": "<AliCloudWorkers>"
+            "type": "string",
+            "defaultValue": "10"
         }
     },
     "variables": {
@@ -164,7 +164,7 @@
                         "AliCloudAccessKey": "[parameters('AliCloudAccessKey')]",
                         "AliCloudProjects": "[parameters('AliCloudProjects')]",
                         "AliCloudWorkers": "[parameters('AliCloudProjects')]",
-                        "WEBSITE_RUN_FROM_PACKAGE": "https://github.com/KateShapovalova/azure_sentinel_data_connectors/raw/main/alicloud-azure-sentinel-data-connector/AliCloudCloudhubAPISentinelConn.zip?raw=true"
+                        "WEBSITE_RUN_FROM_PACKAGE": "https://github.com/KateShapovalova/AliCloudSentinelConnector/blob/master/AliCloudConn.zip?raw=true"
                     }
                 }
             ]
