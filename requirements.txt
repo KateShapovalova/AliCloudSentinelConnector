@@ -3,6 +3,6 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 azure-storage-file-share==12.3.0
-azure-functions
-requests
-aliyun-log-python-sdk
+azure-functions==1.10.1
+requests==2.27.1
+aliyun-log-python-sdk==0.7.7

@@ -8,7 +8,7 @@ import hmac
 import base64
 import logging
 from datetime import datetime, timedelta
-from state_manager import StateManager
+from .state_manager import StateManager
 import re
 import azure.functions as func
 import json
@@ -41,6 +41,7 @@ def generate_date():
     current_time = datetime.utcnow().replace(second=0, microsecond=0) - timedelta(minutes=10)
     state = StateManager(connection_string=connection_string)
     past_time = state.get()
+    # past_time = 0
     if past_time is not None:
         logging.info("The last time point is: {}".format(past_time))
     else:
