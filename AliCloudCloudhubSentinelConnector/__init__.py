@@ -112,8 +112,7 @@ def gen_chunks(data, start_time, end_time):
             success += len(chunk)
         else:
             failed += len(chunk)
-    logging.info("{} successfully added, {} failed. Period(UTC): {} - {}".format(success, failed, start_time.strftime(
-        "%d.%m.%Y %H:%M:%S"), end_time.strftime("%d.%m.%Y %H:%M:%S")))
+    logging.info("{} successfully added, {} failed. Period(UTC): {} - {}".format(success, failed, start_time, end_time))
 
 
 def get_list_logstores(client, project):
